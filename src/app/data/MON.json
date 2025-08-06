@@ -1,0 +1,24 @@
+{ 
+"network":"MON",
+"network_desc":"Maintenance Output Network",
+"nodes":[
+  {"node":"at430PM","type":"all","class":"input","desc":"Clock time of 4:30 PM"}, 
+  {"node":"reportGenerationExpectedOutput","type":"all","class":"output","desc":"Output of Expect report generation"}, 
+  {"node":"reportGenerationOutput","type":"all","class":"output","desc":"Output of Report generation"}, 
+  {"node":"updatePizzaCountExpectedOutput","type":"all","class":"output","desc":"Output of Expected update of pizza count"}, 
+  {"node":"updateRevenueExpectedOutput","type":"all","class":"output","desc":"Output of Expected update of revenue"}, 
+  {"node":"updateBoxCountExpectedOutput","type":"all","class":"output","desc":"Output of Expected update of box count"}, 
+  {"node":"updateDoughCountExpectedOutput","type":"all","class":"output","desc":"Output of Expected update of dough count"}, 
+  {"node":"updateSauceVolumeExpectedOutput","type":"all","class":"output","desc":"Output of Expected update of targetmatarget sauce volume"}, 
+  {"node":"updateCheeseVolumeExpectedOutput","type":"all","class":"output","desc":"Output of Expected update of cheese volume"}
+],
+"links":[
+  {"source":"at430PM","target":"reportGenerationExpectedOutput","type":"standard"}, 
+  {"source":"at430PM","target":"reportGenerationOutput","type":"standard"}, 
+  {"source":"at430PM","target":"updatePizzaCountExpectedOutput","type":"standard"}, 
+  {"source":"at430PM","target":"updateRevenueExpectedOutput","type":"standard"}, 
+  {"source":"at430PM","target":"updateBoxCountExpectedOutput","type":"standard"}, 
+  {"source":"at430PM","target":"updateDoughCountExpectedOutput","type":"standard"}, 
+  {"source":"at430PM","target":"updateSauceVolumeExpectedOutput","type":"standard"}, 
+  {"source":"at430PM","target":"updateCheeseVolumeExpectedOutput","type":"standard"}
+]}

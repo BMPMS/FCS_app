@@ -1,0 +1,34 @@
+[
+    {
+        "source": "dispenseSauceExpected-OIN",
+        "target": "dispenseSauceExpectedOutput-OIN"
+    },
+    {
+        "source":  "dispenseSauce-OIN",
+        "target": "dispenseSauceOutput-OIN"
+    },
+    {
+        "source": "dispenseSauceExpected-OEN",
+        "target": "dispenseSauceDiscrepancy-OEN"
+    },
+    {
+        "source": "dispenseSauce-OEN",
+        "target": "dispenseSauceDiscrepancy-OEN"
+    },
+    {
+        "source":  "dispenseSauceDiscrepancy-OFON",
+        "target": "dispenseSauceDiscrepancyOutput-OFON"
+    },
+    {
+        "source": "dispenseSauceExpectedOutput-OIN"
+        "target": "dispenseSauceExpected-OEN"
+    },
+    {
+        "source": "dispenseSauceOutput-OIN",
+        "target":  "dispenseSauce-OEN"
+    },
+    {
+        "source": "dispenseSauceDiscrepancy-OEN",
+        "target": "dispenseSauceDiscrepancy-OFON"
+    }
+]

@@ -1,0 +1,28 @@
+{ 
+"network":"MFON",
+"network_desc":"Maintenance Feedback Output Network",
+"nodes":[
+  {"node":"reportGenerationDiscrepancy","type":"all","class":"input","desc":"Discrepancy for Report generation"}, 
+  {"node":"updatePizzaCountDiscrepancy","type":"all","class":"input","desc":"Discrepancy for Update of pizza count"}, 
+  {"node":"updateRevenueCountDiscrepancy","type":"all","class":"input","desc":"Discrepancy for Update of revenue"}, 
+  {"node":"updateBoxCountDiscrepancy","type":"all","class":"input","desc":"Discrepancy for Update of box count"}, 
+  {"node":"updateDoughCountDiscrepancy","type":"all","class":"input","desc":"Discrepancy for Update of dough count"}, 
+  {"node":"updateSauceVolumeDiscrepancy","type":"all","class":"input","desc":"Discrepancy for Update of targetmatarget sauce volume"}, 
+  {"node":"updateCheeseVolumeDiscrepancy","type":"all","class":"input","desc":"Discrepancy for Update of cheese volume"}, 
+  {"node":"reportGenerationDiscrepancyOutput","type":"all","class":"output","desc":"Output for Discrepancy for Report generation"}, 
+  {"node":"updatePizzaCountDiscrepancyOutput","type":"all","class":"output","desc":"Output for Discrepancy for Update of pizza count"}, 
+  {"node":"updateRevenueCountDiscrepancyOutput","type":"all","class":"output","desc":"Output for Discrepancy for Update of revenue"}, 
+  {"node":"updateBoxCountDiscrepancyOutput","type":"all","class":"output","desc":"Output for Discrepancy for Update of box count"}, 
+  {"node":"updateDoughCountDiscrepancyOutput","type":"all","class":"output","desc":"Output for Discrepancy for Update of dough count"}, 
+  {"node":"updateSauceVolumeDiscrepancyOutput","type":"all","class":"output","desc":"Output for Discrepancy for Update of targetmatarget sauce volume"}, 
+  {"node":"updateCheeseVolumeDiscrepancyOutput","type":"all","class":"output","desc":"Output for Discrepancy for Update of cheese volume"}
+],
+"links":[
+  {"source":"reportGenerationDiscrepancy","target":"reportGenerationDiscrepancyOutput","type":"standard"}, 
+  {"source":"updatePizzaCountDiscrepancy","target":"updatePizzaCountDiscrepancyOutput","type":"standard"}, 
+  {"source":"updateRevenueCountDiscrepancy","target":"updateRevenueCountDiscrepancyOutput","type":"standard"}, 
+  {"source":"updateBoxCountDiscrepancy","target":"updateBoxCountDiscrepancyOutput","type":"standard"}, 
+  {"source":"updateDoughCountDiscrepancy","target":"updateDoughCountDiscrepancyOutput","type":"standard"}, 
+  {"source":"updateSauceVolumeDiscrepancy","target":"updateSauceVolumeDiscrepancyOutput","type":"standard"}, 
+  {"source":"updateCheeseVolumeDiscrepancy","target":"updateCheeseVolumeDiscrepancyOutput","type":"standard"} 
+]}

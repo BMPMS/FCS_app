@@ -1,0 +1,26 @@
+{ 
+"arch_router":"MAINT",
+"routes":[
+  {"source_net":"MIN","source_node":"at430PMOutput","dest_net":"MON","dest_node":"at430PM"}, 
+  {"source_net":"MIN","source_node":"reportGenerationExpectedOutput","dest_net":"MEN","dest_node":"reportGenerationExpected"}, 
+  {"source_net":"MIN","source_node":"reportGenerationOutput","dest_net":"MEN","dest_node":"reportGeneration"}, 
+  {"source_net":"MIN","source_node":"updatePizzaCountExpectedOutput","dest_net":"MEN","dest_node":"updatePizzaCountExpected"}, 
+  {"source_net":"MIN","source_node":"updatePizzaCountOutput","dest_net":"MEN","dest_node":"updatePizzaCount"}, 
+  {"source_net":"MIN","source_node":"updateRevenueExpectedOutput","dest_net":"MEN","dest_node":"updateRevenueExpected"}, 
+  {"source_net":"MIN","source_node":"updateRevenueCountOutput","dest_net":"MEN","dest_node":"updateRevenueCount"}, 
+  {"source_net":"MIN","source_node":"updateBoxCountExpectedOutput","dest_net":"MEN","dest_node":"updateBoxCountExpected"}, 
+  {"source_net":"MIN","source_node":"updateBoxCountOutput","dest_net":"MEN","dest_node":"updateBoxCount"}, 
+  {"source_net":"MIN","source_node":"updateDoughCountExpectedOutput","dest_net":"MEN","dest_node":"updateDoughCountExpected"}, 
+  {"source_net":"MIN","source_node":"updateDoughCountOutput","dest_net":"MEN","dest_node":"updateDoughCount"}, 
+  {"source_net":"MIN","source_node":"updateSauceVolumeExpectedOutput","dest_net":"MEN","dest_node":"updateSauceVolumeExpected"}, 
+  {"source_net":"MIN","source_node":"updateSauceVolumeOutput","dest_net":"MEN","dest_node":"updateSauceVolume"}, 
+  {"source_net":"MIN","source_node":"updateCheeseVolumeExpectedOutput","dest_net":"MEN","dest_node":"updateCheeseVolumeExpected"}, 
+  {"source_net":"MIN","source_node":"updateCheeseVolumeOutput","dest_net":"MEN","dest_node":"updateCheeseVolume"}, 
+  {"source_net":"MEN","source_node":"reportGenerationDiscrepancyOutput","dest_net":"MFON","dest_node":"reportGenerationDiscrepancy"}, 
+  {"source_net":"MEN","source_node":"updatePizzaCountDiscrepancyOutput","dest_net":"MFON","dest_node":"updatePizzaCountDiscrepancy"}, 
+  {"source_net":"MEN","source_node":"updateRevenueCountDiscrepancyOutput","dest_net":"MFON","dest_node":"updateRevenueCountDiscrepancy"}, 
+  {"source_net":"MEN","source_node":"updateBoxCountDiscrepancyOutput","dest_net":"MFON","dest_node":"updateBoxCountDiscrepancy"}, 
+  {"source_net":"MEN","source_node":"updateDoughCountDiscrepancyOutput","dest_net":"MFON","dest_node":"updateDoughCountDiscrepancy"}, 
+  {"source_net":"MEN","source_node":"updateSauceVolumeDiscrepancyOutput","dest_net":"MFON","dest_node":"updateSauceVolumeDiscrepancy"}, 
+  {"source_net":"MEN","source_node":"updateCheeseVolumeDiscrepancyOutput","dest_net":"MFON","dest_node":"updateCheeseVolumeDiscrepancy"} 
+]}

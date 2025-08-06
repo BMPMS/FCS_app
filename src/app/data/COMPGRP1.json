@@ -1,0 +1,81 @@
+{
+  "network": "COMPGRP1",
+  "network_desc": "Group 1 Computation Functions",
+  "nodes": [
+    {
+      "node": "computation1",
+      "type": "comp",
+      "class": "input",
+      "desc": "#include <stdio>\\nvoid computation()\\n{\\n  write_node(a);\\n  write_node(b);\\n}\\n"
+    },
+    {
+      "node": "nodea",
+      "type": "any",
+      "class": "output",
+      "desc": "node a from comp1"
+    },
+    {
+      "node": "nodeb",
+      "type": "any",
+      "class": "output",
+      "desc": "node b from comp1"
+    },
+    {
+      "node": "computation2",
+      "type": "comp",
+      "class": "input",
+      "desc": "#include <stdio>\\nvoid computation()\\n{\\n  write_node(c);\\n  write_node(d);\\n}\\n"
+    },
+    {
+      "node": "nodec",
+      "type": "any",
+      "class": "output",
+      "desc": "node c from comp2"
+    },
+    {
+      "node": "noded",
+      "type": "any",
+      "class": "output",
+      "desc": "node d from comp2"
+    },
+    {
+      "node": "computation3",
+      "type": "comp",
+      "class": "output",
+      "desc": "#include <stdio>\\nvoid computation()\\n{\\n  turn_on_motor();\\n}\\n"
+    },
+    {
+      "node": "nodee",
+      "type": "any",
+      "class": "input",
+      "desc": "trigger comp3"
+    },
+    {
+      "node": "computation4",
+      "type": "comp",
+      "class": "output",
+      "desc": "#include <stdio>\\nvoid computation()\\n{\\n  turn_off_motor();\\n}\\n"
+    },
+    {
+      "node": "nodef",
+      "type": "any",
+      "class": "input",
+      "desc": "trigger comp4"
+    },
+    {
+      "node": "nodeg",
+      "type": "any",
+      "class": "input",
+      "desc": "trigger comp4"
+    }
+  ],
+  "links": [
+    { "source": "computation1", "target": "nodea", "type": "standard" },
+    { "source": "computation1", "target": "nodeb", "type": "standard" },
+    { "source": "computation2", "target": "nodec", "type": "standard" },
+    { "source": "computation2", "target": "noded", "type": "standard" },
+    { "source": "nodee", "target": "computation3", "type": "standard" },
+    { "source": "nodef", "target": "computation4", "type": "standard" },
+    { "source": "nodeg", "target": "computation4", "type": "standard" }
+  ]
+}
