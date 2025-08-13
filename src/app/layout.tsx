@@ -10,7 +10,7 @@ const figTree = Figtree({
 
 
 export const metadata: Metadata = {
-  title: "FCN - experimental force",
+  title: "FCN playground",
   description: "",
 };
 
@@ -19,8 +19,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-    console.log('App rendering');
-    debugger;
+
   return (
     <html lang="en">
       <body

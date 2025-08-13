@@ -3,9 +3,12 @@ import React from 'react';
 interface SidePanelProps {
     isOpen: boolean;
     onClose: () => void;
+    architectures: {label: string, id: number}[]
+    updateArchitectureId: (id: number) => void;
 }
 
-const SidePanel: React.FC<SidePanelProps> = ({ isOpen, onClose }) => {
+const SidePanel: React.FC<SidePanelProps> = ({isOpen, onClose, architectures, updateArchitectureId }) => {
+
     return (
         <>
             {/* Sliding Side Panel */}
@@ -31,7 +34,20 @@ const SidePanel: React.FC<SidePanelProps> = ({ isOpen, onClose }) => {
                 </div>
                 {/* Additional panel content can go here */}
                 <div className="flex items-center justify-between p-4 ">
-                    <h3>Can add content here..</h3>
+                    <label htmlFor="architecture-select" className="block mb-1 text-sm font-medium text-gray-700 ">
+                         Architecture
+                    </label>
+                    <select
+                        id="architecture-select"
+                        className="block w-[60%] px-1 py-1 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-200 focus:blue-200 text-sm"
+                        onChange={(e) => updateArchitectureId(+e.target.value)}
+                    >
+                        {architectures.map((arch) => (
+                            <option key={arch.id} value={arch.id}>
+                                {arch.label}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
             </div>

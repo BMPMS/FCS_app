@@ -1,4 +1,3 @@
-import {ScaleLinear} from "d3";
 import * as d3 from "d3";
 
 export interface DataNode {
@@ -8,8 +7,6 @@ export interface DataNode {
     desc: string;
     id?: string;
     nodeDepth?: number;
-    extraX?: number;
-    extraY?:number;
 }
 
 export interface DataLink {
@@ -18,6 +15,23 @@ export interface DataLink {
     type: string;
 }
 
+export interface ChainNode extends d3.SimulationNodeDatum {
+    id: string;
+    type: string;
+    class: string;
+    desc: string;
+    network: string;
+    depth: number;
+    fail?: boolean;
+
+}
+export interface ChainLink  extends d3.SimulationLinkDatum<ChainNode>{
+    id: string;
+    source: string | ChainNode;
+    target: string | ChainNode;
+    type: string;
+
+}
 export interface HierarchyNode extends d3.SimulationNodeDatum  {
     name: string;
     type: string;
@@ -35,37 +49,35 @@ export interface HierarchyNode extends d3.SimulationNodeDatum  {
     fy?: number | null;
 }
 
-export interface ChartNode extends d3.SimulationNodeDatum {
+export interface ChartNode extends d3.SimulationNodeDatum{
     id: string;
     node:string;
     type: string;
     class: string;
     desc: string;
     nodeDepth: number;
-    extraX: number;
-    extraY: number;
-    fail?: boolean;
-    network?: string;
-    oppositePos?:number;
-    bounds?: {x: number, widthOrHeight: number, opposite: number, top: number};
-    treePositionScale?:  ScaleLinear<number, number, never>;
-}
-
-export interface HierarchyLink extends d3.SimulationLinkDatum<d3.HierarchyNode<HierarchyNode>>{
-    source: string | d3.HierarchyNode<HierarchyNode>;
-    target: string | d3.HierarchyNode<HierarchyNode>;
-    type: string;
+    xPos?: number;
+    yPos?:number;
+    finalDepth?: boolean
 }
 
 
-export interface ChartLink extends d3.SimulationLinkDatum<ChartNode>{
-    source: string | ChartNode;
-    target: string | ChartNode;
+
+export type NetworkLink =
+{id: string;
+    source: string;
+    target: string;
+    links: ArcRoute[]
+}
+
+export interface ChartLink {
+    source: string ;
+    target: string ;
     type: string;
     id: string;
 }
 
-type ArcRoute = {
+export type ArcRoute = {
     source_net: string;
     source_node: string;
     dest_net: string;
@@ -80,7 +92,7 @@ export type Network = {
 }
 
 
-type Layer = {
+export type Layer = {
     layer: number;
     network: string;
 }
@@ -101,19 +113,5 @@ export type ChartData = {
     architecture: Architecture[],
     networks: { id: string, data: Network}[];
 }
-export interface ForceExperimentChartProps {
-    chartData: ChartData;
-    containerClass: string;
-    direction: string;
-    flowMode: boolean;
-}
 
-export  type NodeChain = {
-    type: string;
-    id: string;
-    index: number;
-    source: string;
-    originNode: string;
-    linkOrNodeType: string;
-    target: string;
-}
+
