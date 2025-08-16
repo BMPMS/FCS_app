@@ -43,28 +43,34 @@ export const NODETYPE_ICONS = {
     all: "\ue439",
     any: "\ue438",
     suppression: "\uf714",
-    layer: "\uf5fd",
-    network: "\uf126",
-    depth: "\uf3c5",
     play:"\uf04b"
+};
+
+export const NODETYPE_ICON_NAMES = {
+    comp: "fa-solid fa-function",
+    all: "fa-solid fa-pipe-valve",
+    any: "fa-solid fa-pipe-section",
+    suppression: "fa-solid fa-skull-crossbones",
 };
 
 export const ARROW_START_PATH = "M9,-4L1,0L9,4";
 export const ARROW_END_PATH = "M1, -4L9,0L1,4";
 export const ARROW_VIEWBOX = "0 -5 10 10";
 
-export const ICONS = {zoomFit:"\uf0b2",zoomOut:"\uf010",zoomIn:"\uf00e"};
+export const ICONS = {zoomFit:"\uf0b2",zoomOut:"\uf010",zoomIn:"\uf00e", locked:"\uf023", unlocked:"\uf3c1"};
 
 interface MainForceChartProps {
     chartData: ChartData;
     architectureId: number;
     containerClass: string;
+    chainContainerClass: string;
     direction: string;
     searchNodes: string[];
 }
 
 const MainForceChart: FC<MainForceChartProps> = ({
                                                                  containerClass,
+                                                                 chainContainerClass,
                                                                  chartData,
                                                                  direction,
                                                      architectureId,
@@ -73,6 +79,8 @@ const MainForceChart: FC<MainForceChartProps> = ({
 
     const [tick, setTick] = useState(0);
     const zoomLevel: React.RefObject<string> = useRef("start");
+    const zoomLock: React.RefObject<boolean> = useRef(false);
+
     const ref = useRef(null);
 
     // Modified hook that returns the tick value
@@ -95,6 +103,7 @@ const MainForceChart: FC<MainForceChartProps> = ({
         const containerNode = d3.select<Element, unknown>(`.${containerClass}Container`).node();
         if (!containerNode) return;
         const {  clientHeight: svgHeight, clientWidth: svgWidth } = containerNode;
+        zoomLock.current = false;
 
         // keeping filter in the chart for now in case multiple architecture view is needed later
         const filteredChartData =
@@ -117,37 +126,45 @@ const MainForceChart: FC<MainForceChartProps> = ({
             .translateExtent([[0,0],[svgWidth,svgHeight]])
             .on("zoom", (event) => {
                 const { x, y, k } = event.transform;
-                if(k < 2 && zoomLevel.current !== "top"){
-                    zoomLevel.current = "top";
-                    resetZoomLevels(baseSvg,zoomLevel.current);
-                }
-                if(k >= 2 && k < 4.5 &&  zoomLevel.current !== "middle"){
-                    zoomLevel.current = "middle";
-                    resetZoomLevels(baseSvg,zoomLevel.current)
-                }
-                if(k >= 4.5 &&  zoomLevel.current !== "bottom"){
-                    zoomLevel.current ="bottom";
-                    resetZoomLevels(baseSvg,zoomLevel.current)
+                if(!zoomLock.current){
+                    if(k < 2 && zoomLevel.current !== "top"){
+                        zoomLevel.current = "top";
+                        resetZoomLevels(baseSvg,zoomLevel.current,svgWidth,direction);
+                    }
+                    if(k >= 2 && k < 4.5 &&  zoomLevel.current !== "middle"){
+                        zoomLevel.current = "middle";
+                        resetZoomLevels(baseSvg,zoomLevel.current,svgWidth,direction)
+                    }
+                    if(k >= 4.5 &&  zoomLevel.current !== "bottom"){
+                        zoomLevel.current ="bottom";
+                        resetZoomLevels(baseSvg,zoomLevel.current,svgWidth,direction)
+                    }
                 }
                 svg.attr("transform", `translate(${x},${y}) scale(${k})`);
 
             });
 
-        drawZoomButtons(baseSvg,svgWidth,svgHeight,[],zoom);
+        const changeZoomLock = (newValue: boolean) => {
+            console.log(newValue)
+            zoomLock.current = newValue;
+        }
+
+        drawZoomButtons(baseSvg,svgWidth,svgHeight,[],zoom,changeZoomLock);
 
         baseSvg.call(zoom).on("dblclick.zoom", null);
 
         // svg = parts which are affected by zoom
         const svg = baseSvg.select(".chartSvg");
 
-        drawGroupTree(baseSvg,filteredChartData,svgWidth,svgHeight,direction, containerClass)
+        drawGroupTree(baseSvg,filteredChartData,svgWidth,svgHeight,direction, containerClass, chainContainerClass)
 
 
-    }, [containerClass, chartData, direction,zoomLevel,architectureId, searchNodes, tick]);
+    }, [containerClass, chartData, direction,zoomLevel,architectureId, searchNodes, tick, chainContainerClass]);
 
 
     return (
         <>
+            <div id="mainChartTooltip" className={"chartTooltip"}/>
             <svg className={`noselect svg_${containerClass}`} ref={ref}>
                 <defs className={"arrowDefs"}>
                 </defs>

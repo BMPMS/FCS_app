@@ -67,7 +67,11 @@ export type NetworkLink =
 {id: string;
     source: string;
     target: string;
-    links: ArcRoute[]
+    links: ArcRoute[];
+    sourceDimensions: {[key: string] :{[key: string] : {[key: string] : number}}};
+    targetDimensions: {[key: string] :{[key: string] : {[key: string] : number}}};
+    sourcePositions: {x: number, y: number};
+    targetPositions: {x: number, y: number};
 }
 
 export interface ChartLink {

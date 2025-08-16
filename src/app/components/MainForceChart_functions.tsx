@@ -1,5 +1,15 @@
 import * as d3 from 'd3';
-import {Architecture, ArcRoute, ChartData, ChartLink, ChartNode, Layer, Network, NetworkLink} from "@/types/data";
+import {
+    Architecture,
+    ArcRoute,
+    ChainNode,
+    ChartData,
+    ChartLink,
+    ChartNode,
+    Layer,
+    Network,
+    NetworkLink
+} from "@/types/data";
 import {
     ARROW_END_PATH,
     ARROW_START_PATH,
@@ -10,6 +20,9 @@ import {
     NODEFLOW_COLORS,
     NODETYPE_ICONS
 } from "@/app/components/MainForceChart";
+import {getTooltipText, measureWidth} from "@/app/components/ChainForceChart_functions";
+import {CHAIN_CIRCLE_RADIUS} from "@/app/components/ChainForceChart";
+import {getRemInPixels} from "@/app/components/sharedFunctions";
 
 const networkMidData = [
     {position: "left", varName: "input", positionIndex: 0},
@@ -143,9 +156,10 @@ export const drawZoomButtons = (
     width: number,
     height: number,
     nodes: ChartNode[],
-    zoom:  d3.ZoomBehavior<SVGSVGElement , unknown>
+    zoom:  d3.ZoomBehavior<SVGSVGElement , unknown>,
+    setZoomLock: (newValue: boolean) => void
 ) => {
-    const buttonTypes = ["zoomFit","zoomOut","zoomIn"];
+    const buttonTypes = ["zoomFit","zoomOut","zoomIn","unlocked"];
     const buttonMargin = 5;
     const buttonWidthHeight = 30;
 
@@ -161,6 +175,32 @@ export const drawZoomButtons = (
         });
 
     buttonsGroup.attr("transform",(d,i) => `translate(${width - buttonWidthHeight - buttonMargin},${height - buttonMargin - buttonWidthHeight - (i * (buttonWidthHeight + buttonMargin))})`)
+        .on("click", (event, d) => {
+            if(d === "unlocked"){
+                const currentGroup = d3.select(event.currentTarget);
+                const isLocked = currentGroup.classed("locked");
+                if(isLocked){
+                    currentGroup.attr("class", "fa fa-strong buttonIcon");
+                    setZoomLock(false);
+                } else {
+                    currentGroup.attr("class", "locked fa fa-strong buttonIcon");
+                    setZoomLock(true);
+                }
+               currentGroup.select(".buttonIcon")
+                    .text(isLocked ? ICONS["unlocked"] : ICONS["locked"])
+
+            } else {
+                performZoomAction({
+                    baseSvg,
+                    nodes,
+                    height,
+                    width,
+                    transitionTime: 500,
+                    zoomAction: d,
+                    zoom
+                })
+            }
+        })
 
     buttonsGroup.select(".buttonRect")
         .attr("cursor","pointer")
@@ -170,19 +210,8 @@ export const drawZoomButtons = (
         .attr("stroke", COLORS.grey)
         .attr("stroke-width", 0.5)
         .attr("rx", 3)
-
         .attr("ry",3)
-        .on("click", (event, d) => {
-            performZoomAction({
-                baseSvg,
-                nodes,
-                height,
-                width,
-                transitionTime: 500,
-                zoomAction: d,
-                zoom
-            })
-        })
+
 
     buttonsGroup.select(".buttonIcon")
         .attr("pointer-events", "none")
@@ -198,11 +227,16 @@ export const drawZoomButtons = (
 type NetworkData = {
     layer: number;
     layerIndex: number;
+    layerCount: number;
+    maxDepth: number;
+    maxNodesPerDepth: number;
     network: string;
     description: string;
     nodes: ChartNode[];
     links: ChartLink[];
-    posShift?: number;
+    xPos?: number;
+    yPos?: number;
+    radius?: number;
 }
 
 type TreeData = {
@@ -243,13 +277,20 @@ const getLayerData = (layers: Layer[],networks: { id: string, data: Network}[]) 
         const maxDepth = d3.max(nodes, (m) => m.nodeDepth)
         if(maxDepth){
             const matchingLayer = acc.filter((f) => f.layer === entry.layer + 1);
+
+            const maxDepth = d3.max(nodes, (d) => d.nodeDepth) || 0;
+            const depthRollup = Array.from(d3.rollup(nodes, (v) => v.length, (g) => g.nodeDepth));
+
             acc.push({
                 layerIndex: matchingLayer.length,
+                layerCount: layers.filter((f) => f.layer === entry.layer).length,
                 layer: entry.layer + 1,
                 network: entry.network,
                 description: networkData?.data.network_desc || "",
                 nodes,
-                links
+                links,
+                maxDepth,
+                maxNodesPerDepth: d3.max(depthRollup, (d) => d[1]) || 0
             })
         }
         return acc;
@@ -296,7 +337,7 @@ export const trimPathToRadius = (
 }
 
 
-const getNetworkLinks = (networkRoutes: ArcRoute[], type: string) =>
+const getNetworkLinks = (networkRoutes: ArcRoute[], type: string, networks:  NetworkData[], svgWidth: number) =>
     Array.from(d3.group(networkRoutes, (d) => `${d[`source_${type}` as keyof typeof d]}|${d[`dest_${type}` as keyof typeof d]}`))
         .reduce((acc, entry) => {
             let source = "";
@@ -310,17 +351,42 @@ const getNetworkLinks = (networkRoutes: ArcRoute[], type: string) =>
                 source = `${groupSplit[0]}-${entry[1][0].source_net}`;
                 target = `${groupSplit[1]}-${entry[1][0].dest_net}`;
             }
+            const getDimensions = (network: string) => ["top", "middle","bottom"]
+                .reduce((dimAcc, zoomLevel) => {
+                    const networkOnly = network.includes("-") ? network.split("-")[1] : network;
+                    const matchingNetwork = networks.find((f) => f.network === networkOnly);
+                    if(matchingNetwork){
+                        dimAcc[zoomLevel] = {
+                        vertical:{
+                            width:  getNodeWidth(matchingNetwork,zoomLevel,svgWidth,"vertical"),
+                            height: getNodeHeight(matchingNetwork,zoomLevel,"vertical")},
+                        horizontal: {
+                            width:  getNodeWidth(matchingNetwork,zoomLevel,svgWidth,"horizontal"),
+                            height: getNodeHeight(matchingNetwork,zoomLevel,"horizontal")},}
+
+                    }
+                    return dimAcc;
+                },{} as {[key: string] :{[key: string] : {[key: string] : number}}} )
 
             acc.push({
+                id: "placeholder",
+                sourcePositions: {x: 0,y:0},
+                targetPositions: {x: 0,y:0},
+                sourceDimensions: getDimensions(source),
+                targetDimensions: getDimensions(target),
                 source,
                 target,
                 links: entry[1]
             })
             return acc;
-        },[] as {source: string, target: string, links:ArcRoute[]}[])
+        },[] as NetworkLink[])
         .reduce((acc, entry,index) => {
             acc.push({
                 id: `${type}-${index}`,
+                sourceDimensions: entry.sourceDimensions,
+                targetDimensions: entry.targetDimensions,
+                sourcePositions: entry.sourcePositions,
+                targetPositions: entry.targetPositions,
                 source: entry.source,
                 target: entry.target,
                 links: entry.links
@@ -389,6 +455,7 @@ const getTreeData = (
                     .padding(0);
                 const currentTreeData = currentTree(currentHierarchy);
                 if(currentTreeData.children){
+                    const networks = currentTreeData.children.flat().map((m) => m.data.networkData).flat()
                     // for each child, create a network entry
                     acc.push({
                         name: entry.data.name,
@@ -396,8 +463,8 @@ const getTreeData = (
                         x1: entry.x1,
                         y0: entry.y0,
                         y1: entry.y1,
-                        networkLinks: getNetworkLinks(entry.data.data.routes, "net"),
-                        networkNodeLinks: getNetworkLinks(entry.data.data.routes, "node"),
+                        networkLinks: getNetworkLinks(entry.data.data.routes, "net", networks,svgWidth),
+                        networkNodeLinks: getNetworkLinks(entry.data.data.routes, "node", networks,svgWidth),
                         layerData: currentTreeData.children
                     })
                 }
@@ -409,39 +476,52 @@ const getTreeData = (
 }
 
 
+const getMidWidths = () => {
+    const midRadius = getRemInPixels() * 0.7;
+    const minMidWidth = midRadius * 12;
+    const maxMidWidth = midRadius * 18;
+    return {minMidWidth, maxMidWidth};
+}
+const getNodeWidth = (network: NetworkData, zoomLevel: string, svgWidth: number, direction: string) => {
+    const fontSize = getLabelFontSize(zoomLevel);
+    const labelWidth = measureWidth(network.network, fontSize);
+    const padding = getRemInPixels();
+    const maxNodeWidth = (svgWidth/network.layerCount) - (padding * 4);
+    if(zoomLevel === "top") return Math.min(labelWidth + padding, maxNodeWidth);
+    const {minMidWidth, maxMidWidth} = getMidWidths();
+
+    if(zoomLevel === "middle") return maxNodeWidth < maxMidWidth ? minMidWidth : maxMidWidth;
+    const circleRadius = network.radius || 0;
+    if(direction === "vertical") return (network.maxNodesPerDepth + 1) * (circleRadius * 2);
+    return network.maxDepth * (circleRadius * 6);
+}
+
+const getNodeHeight = (network: NetworkData,zoomLevel: string,  direction: string) => {
+    const padding = getRemInPixels();
+    if(zoomLevel === "top") return padding * 2.5;
+    const midRadius = (padding * 0.7);
+    if(zoomLevel === "middle") return midRadius * 9; // space for 4 circles + padding
+    const circleRadius = network.radius || 0;
+    if(direction === "vertical") return ((network.maxDepth + 1) * (circleRadius * 2)) + (padding * 2);
+    return (network.maxNodesPerDepth + 1) * (circleRadius * 2);
+}
+
 export const drawGroupTree = (
     svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
     chartData: ChartData,
     svgWidth: number,
     svgHeight: number,
     direction: string,
-    containerClass: string
+    containerClass: string,
+    chainContainerClass: string
 
 ) => {
 
     const marginTop = 30;
     // currently array of networks with positioning and data (can also have multiple architectures if needed)
     const treeData =  getTreeData(chartData,svgWidth,svgHeight, marginTop,direction);
-    let nodeHeight = 0;
-    let nodeWidth = 0;
 
-    // set nodeHeight + width depending on direction
-    if(direction === "vertical"){
-        const minHeight = d3.min(treeData, (d) => d3.min(d.layerData, (m) => m.y1 - m.y0)) || 0;
-        const maxNetworksInALayer = d3.max(treeData, (d) => d3.max(d.layerData, (m) => m.data.networkData.length)) || 0;
-        const minArchitectureWidth = d3.min(treeData, (d) => d.x1 - d.x0) || 0;
-
-        nodeWidth = (minArchitectureWidth/maxNetworksInALayer)/2;
-        nodeHeight = minHeight/2;
-    } else {
-        const minWidth = d3.min(treeData, (d) => d3.min(d.layerData, (m) => m.x1 - m.x0)) || 0;
-        const maxNetworksInALayer = d3.max(treeData, (d) => d3.max(d.layerData, (m) => m.data.networkData.length)) || 0;
-        const minArchitectureHeight = d3.min(treeData, (d) => d.y1 - d.y0) || 0;
-
-        nodeWidth = minWidth/2;
-        nodeHeight =  (minArchitectureHeight/maxNetworksInALayer)/2;
-
-    }
+    const padding = getRemInPixels();
 
     svg.select(".chartGroup").attr("transform",`translate(0,${marginTop})`)
 
@@ -505,34 +585,52 @@ export const drawGroupTree = (
 
 
     // networkPositions array - stores positions for use with links
-    const networkPositions: {[key: string] : {x: number, y: number}} = {}
+    const networkPositions: {[key: string] : {x: number, y: number, bottomWidth: number, bottomHeight: number}} = {}
 
-    const getMaxPerDepth = (nodes: ChartNode[]) => {
-        const depthGroup = Array.from(d3.group(nodes, (g) => g.nodeDepth));
-        return d3.max(depthGroup,(m) => m[1].length);
-    }
 
-    const maxPerDepth =
-        d3.max(treeData, (architecture) =>
-            d3.max(architecture.layerData, (layer) =>
-                d3.max(layer.data.networkData, (network) => getMaxPerDepth(network.nodes))
-            )) || 0;
+    const layerData = treeData[0]?.layerData || [];
+    const maxNodeDepth = d3.max(layerData, (m) => d3.max(m.data.networkData, (n) => n.maxDepth)) || 0;
+    const maxNodesPerDepth = d3.max(layerData, (m) => d3.max(m.data.networkData, (n) => n.maxNodesPerDepth)) || 0;
+    const widthAvailable = svgWidth - (padding * 4);
+    const heightAvailable = (layerData.length === 0 ? 0 : layerData[0].y1 - layerData[0].y0) - (padding * 2);
+
+    const minSpaceHorizontal = widthAvailable/(direction === "vertical" ? maxNodesPerDepth : maxNodeDepth)
+    const minSpaceVertical = heightAvailable/(direction === "vertical"? (maxNodeDepth + 2) : maxNodesPerDepth);
+
 
     // responsive circle radius
-    const networkCircleRadius = ((direction === "vertical"? nodeWidth : nodeHeight)/(maxPerDepth + 1))/2;
+    const networkCircleRadius = (Math.min(minSpaceVertical,minSpaceHorizontal) * 0.9)/2;
 
 
     const networkGroup = layersGroup.select(".networksGroup")
-        .selectAll<SVGGElement,{layer: number, x:number, y: number}[]>(".networkGroup")
+        .selectAll<SVGGElement,NetworkData[]>(".networkGroup")
         .data((d) => {
-            const xSlice = (d.data.architectureWidthHeight || 2)/d.data.networkData.length;
-            // posShift depending on # of networks in a layer and network dimensions
+            const bottomWidths = d.data.networkData.reduce((acc, entry) => {
+                entry.radius = networkCircleRadius;
+                acc.push(getNodeWidth(entry,"bottom",svgWidth,direction));
+                return acc;
+            },[] as number[]);
+            const remainingGaps = ((direction === "vertical" ? svgWidth : svgHeight)
+                - (padding * 4)) - d3.sum(bottomWidths);
+            const gapLength = remainingGaps/(d.data.networkData.length + 1);
+            let currentPosition = gapLength;
             d.data.networkData.map((m,i) => {
-                const posShift = (xSlice/2) + (i * xSlice);
-                m.posShift = posShift;
+
+                if(direction === "vertical"){
+                    m.xPos =  currentPosition + (bottomWidths[i]/2);
+                    m.yPos = 0
+                } else {
+                    m.xPos = 0;
+                    m.yPos =  currentPosition + (bottomWidths[i]/2);
+                }
+                currentPosition += (gapLength + bottomWidths[i])
+
                 networkPositions[m.network] = {
-                    x: (d.data.xPos || 0) + (direction === "vertical" ? posShift || 0 : 0),
-                    y: (d.data.yPos || 0) + (direction === "vertical" ? 0 : posShift || 0 )}
+                    x: (d.data.xPos || 0) + m.xPos,
+                    y: (d.data.yPos || 0) + m.yPos,
+                    bottomWidth: getNodeWidth(m,"bottom",svgWidth,direction),
+                    bottomHeight: getNodeHeight(m,"bottom",direction)
+                }
             })
             return d.data.networkData;
         })
@@ -546,9 +644,35 @@ export const drawGroupTree = (
             return enter;
         });
 
+    const chainGraphSvg = d3.select(`.svg_${chainContainerClass}`);
+
     networkGroup
         .attr("id",(d) => d.network)
-        .attr("transform",(d) => `translate(${(direction === "vertical" ? d.posShift || 0 : 0)},${(direction === "vertical" ? 0 : d.posShift || 0 )})`)
+        .attr("transform",(d) => `translate(${d.xPos},${d.yPos})`)
+        .on("mouseover",(event, d) => {
+            svg.selectAll<SVGRectElement,Network>(".networkRect")
+                .attr("fill",(n) => n.network === d.network ? COLORS.lightgrey : "white")
+            if(chainGraphSvg.node()){
+                chainGraphSvg.selectAll<SVGTextPathElement, ChainNode>(".nodeLabelTextPath")
+                    .attr("opacity", (l) => l.network === d.network ? 0 : 1);
+
+                chainGraphSvg.selectAll<SVGCircleElement, ChainNode>(".nodeCircle")
+                    .attr("fill", (n) => n.network === d.network ? "gold" :
+                        NODEFLOW_COLORS[n.class as keyof typeof NODEFLOW_COLORS])
+                    .attr("r", (n) => n.network === d.network ? CHAIN_CIRCLE_RADIUS * 1.3 : CHAIN_CIRCLE_RADIUS);
+            }
+        })
+        .on("mouseout",() => {
+            svg.selectAll(".networkRect").attr("fill","white");
+            if(chainGraphSvg.node()){
+                chainGraphSvg.selectAll(".nodeLabelTextPath")
+                    .attr("opacity", 1);
+
+                chainGraphSvg.selectAll<SVGCircleElement,ChainNode>(".nodeCircle")
+                    .attr("fill", (d) => NODEFLOW_COLORS[d.class as keyof typeof NODEFLOW_COLORS])
+                    .attr("r",  CHAIN_CIRCLE_RADIUS);
+            }
+        })
 
     networkGroup.select(".networkRect")
         .attr("stroke", COLORS.darkblue)
@@ -556,27 +680,18 @@ export const drawGroupTree = (
         .attr("fill","white")
         .attr("rx", networkCircleRadius)
         .attr("ry",networkCircleRadius)
-        .attr("width", nodeWidth)
-        .attr("height",nodeHeight)
-        .attr("x",   -nodeWidth/2  )
-        .attr("y",  -nodeHeight/2 );
+        .attr("width", (d) => getNodeWidth(d,"top", svgWidth,direction) )
+        .attr("height",(d) => getNodeHeight(d, "top",direction))
+        .attr("x",   (d) => -(getNodeWidth(d, "top",svgWidth,direction))/2  )
+        .attr("y",  (d) => -getNodeHeight(d, "top",direction)/2 );
 
     networkGroup.select(".networkRectLabel")
+      //  .attr("x",   (d) => getNodeWidth(d, "top",svgWidth,direction)/2)
+        .attr("text-anchor","middle")
         .attr("fill", COLORS.darkblue)
         .style("dominant-baseline","middle")
         .attr("y",  2 )
         .text((d) => d.network);
-
-
-    // mid refers to zoom level - small menu which gives a summary but doesn't show individual nodes and links
-    // see networkMidData above for definition of these groups (which will make data reduce clearer)
-    const midSideMargin = 5;
-    const networkIndexMax = d3.max(networkMidData, (d) => d.positionIndex) ||0;
-    const midGroupRadius = (nodeHeight/(networkIndexMax + 2))/2;
-    const midGroupLeftCount = networkMidData.filter((f) => f.position === "left").length;
-    const midGroupRightCount = networkMidData.filter((f) => f.position === "right").length;
-    const midGroupLeftYStep = (nodeHeight - midSideMargin)/midGroupLeftCount;
-    const midGroupRightYStep = (nodeHeight - midSideMargin)/midGroupRightCount;
 
     const networkMidGroup = networkGroup.select(".networkMidGroup")
         .selectAll(".networkMidGroups")
@@ -592,10 +707,12 @@ export const drawGroupTree = (
                     position: entry.position,
                     positionIndex: entry.positionIndex,
                     varName: entry.varName,
-                    dataCount: matchingNodes.length
+                    dataCount: matchingNodes.length,
+                    midNodeWidth: getNodeWidth(d, "middle",svgWidth,direction),
+                    midNodeHeight: getNodeHeight(d, "middle", direction)
                 })
                 return acc;
-            },[] as { position: string, positionIndex: number, varName: string, dataCount: number }[])
+            },[] as { position: string, positionIndex: number, varName: string, dataCount: number,midNodeWidth: number, midNodeHeight: number }[])
 
         })
         .join((group) => {
@@ -606,9 +723,12 @@ export const drawGroupTree = (
             return enter;
         });
 
+    const minCircleRadius = (padding * 0.7);
+    const midPadding = minCircleRadius/4;
+
     networkMidGroup
         .attr("opacity", (d) => d.dataCount === 0 ? 0.2 : 1)
-        .attr("transform",`translate(${-nodeWidth/2},${-nodeHeight/2 + midSideMargin/2})`)
+        .attr("transform",(d) => `translate(${-d.midNodeWidth/2},${-(d.midNodeHeight)/2 + (minCircleRadius/2)})`)
 
     networkMidGroup.select(".midGroupCircle")
         .attr("fill",(d) => d.position === "left"
@@ -616,59 +736,66 @@ export const drawGroupTree = (
         : "white")
         .attr("stroke", (d) => d.position === "left" ? "transparent" : COLORS.grey)
         .attr("stroke-width",0.5)
-        .attr("r",midGroupRadius)
+        .attr("r",minCircleRadius * 0.9)
         .attr("cx", (d) => d.position === "left"
-            ? midSideMargin + midGroupRadius
-            : nodeWidth - midSideMargin - midGroupRadius)
-        .attr("cy",(d) => (d.positionIndex + 0.5)  * (d.position === "left" ? midGroupLeftYStep : midGroupRightYStep))
+            ? midPadding + minCircleRadius
+            : d.midNodeWidth - midPadding - minCircleRadius)
+        .attr("cy",(d) => (d.positionIndex + 0.5)  * (minCircleRadius * 2) )
 
 
     networkMidGroup.select(".midGroupCircleIcon")
         .attr("fill",COLORS.grey)
         .attr("text-anchor","middle")
-        .attr("font-size", midGroupRadius)
+        .attr("font-size", minCircleRadius * 0.8)
         .style("dominant-baseline","middle")
-        .attr("dy",-midGroupRadius * 0.05)
-        .attr("x",  nodeWidth - midSideMargin - midGroupRadius)
-        .attr("y",(d) => (d.positionIndex + 0.5)  * (d.position === "left" ? midGroupLeftYStep : midGroupRightYStep))
+        .attr("dy",-(minCircleRadius * 0.8) * 0.05)
+        .attr("x",  (d) => d.midNodeWidth - midPadding - minCircleRadius)
+        .attr("y",(d) => (d.positionIndex + 0.5)  * (minCircleRadius * 2))
         .text((d) => d.position === "right" ? NODETYPE_ICONS[d.varName as keyof typeof NODETYPE_ICONS] : "")
+
 
     networkMidGroup.select(".midGroupLabel")
         .attr("fill",COLORS.black)
         .attr("text-anchor",(d) => d.position === "left" ? "start" : "end")
-        .attr("font-size", midGroupRadius)
+        .attr("font-size", minCircleRadius * 0.8)
         .style("dominant-baseline","middle")
-        .attr("dy",midGroupRadius * 0.05)
+        .attr("dy",(minCircleRadius * 0.8) * 0.05)
         .attr("x", (d) => d.position === "left"
-            ? midSideMargin + (midGroupRadius * 2) + 3
-            : nodeWidth - midSideMargin - (midGroupRadius * 2) - 3)
-        .attr("y",(d) => (d.positionIndex + 0.5)  * (d.position === "left" ? midGroupLeftYStep : midGroupRightYStep))
-        .text((d) =>  `${d.dataCount} ${d.varName}`);
+            ? midPadding + (minCircleRadius * 2) + 3
+            : d.midNodeWidth - midPadding - (minCircleRadius * 2) - 3)
+        .attr("y",(d) => (d.positionIndex + 0.5)   * (minCircleRadius * 2))
+        .text((d) =>  `${d.dataCount} ${d.midNodeWidth === getMidWidths().minMidWidth ? "" : d.varName}`);
 
     // nodePositions array - stores positions for use with links
     const nodePositions: { [key: string]: {x: number,y:number} } = {};
+
+    networkGroup.select(".networkNodesGroup")
+        .attr("transform",(d) =>
+            `translate(${ -(getNodeWidth(d, "bottom",svgWidth,direction))/2 },
+            ${ -(getNodeHeight(d, "bottom",direction))/2 })`)
 
     // network nodes
     const networkNodesGroup = networkGroup.select(".networkNodesGroup")
         .selectAll(".networkNodeGroup")
         .data((d) => {
+            const nodeWidth = getNodeWidth(d,"bottom",svgWidth,direction);
+            const nodeHeight = getNodeHeight(d,"bottom",direction);
             // group by depth and define point scale
             const depthGroup = Array.from(d3.group(d.nodes, (g) => g.nodeDepth));
+
             const depthScale = d3.scalePoint<number>()
                 .domain(depthGroup.map((m) => m[0]))
-                .range([0,(direction === "vertical" ? nodeHeight : nodeWidth) - 2 - networkCircleRadius * 3]);
+                .range([0,(direction === "vertical" ? nodeHeight : nodeWidth) - padding]);
             return depthGroup.reduce((acc, entry) => {
-                // shiftIndex (node position within depth), shiftDepth (depth position within network)
-                // can't say left or right as switches vertical/horizontal
-                const shiftIndex = ((maxPerDepth - entry[1].length) * (networkCircleRadius * 2))/2;
-                const shiftDepth =  (networkCircleRadius * 1.5 + 1)
+
+                const shiftDepth = networkCircleRadius * 1.5;
                 // calculate + save positions
                 // flag if final depth for network
                 entry[1].forEach((node, index) => {
-                    const depthPos = depthScale(entry[0]) || 0;
-                    const indexPos = (networkCircleRadius * 2) + (index * (networkCircleRadius * 2));
-                    node.xPos =   (direction === "vertical" ? indexPos + shiftIndex : depthPos + shiftDepth) ;
-                    node.yPos = (direction === "vertical" ? depthPos + shiftDepth: indexPos + shiftIndex);
+                    const depthPos = (depthScale(entry[0]) || 0) + shiftDepth;
+                    const indexPos = networkCircleRadius  + (index * (networkCircleRadius * 2));
+                    node.xPos =   networkCircleRadius + (direction === "vertical" ? indexPos  : depthPos) ;
+                    node.yPos = (direction === "vertical" ? depthPos : indexPos );
                     node.finalDepth = entry[0] === depthGroup.length - 1;
                     nodePositions[node.id] = {x: node.xPos, y: node.yPos};
                     acc.push(node);
@@ -680,11 +807,47 @@ export const drawGroupTree = (
             const enter = group.append("g").attr("class", "networkNodeGroup");
             enter.append("circle").attr("class", "nodeCircle");
             enter.append("text").attr("class", "fa nodeCircleIcon");
-            enter.append("text").attr("class", "nodeCircleLabel");
             return enter;
         });
 
-    networkNodesGroup.attr("transform",(d) => `translate(${(d.xPos || 0) - (nodeWidth/2)},${(d.yPos || 0) - (nodeHeight/2)})`)
+    networkNodesGroup.attr("transform",(d) => `translate(${(d.xPos || 0) },${(d.yPos || 0)})`)
+
+    networkNodesGroup
+        .on("mousemove", (event, d) => {
+            if(chainGraphSvg.node()){
+                chainGraphSvg.selectAll<SVGTextPathElement, ChainNode>(".nodeLabelTextPath")
+                    .attr("opacity", (l) => l.id === d.id ? 0 : 1);
+
+                chainGraphSvg.selectAll<SVGCircleElement, ChainNode>(".nodeCircle")
+                    .attr("fill", (n) => n.id === d.id ? "gold" :
+                        NODEFLOW_COLORS[n.class as keyof typeof NODEFLOW_COLORS])
+                    .attr("r", (n) => n.id === d.id ? CHAIN_CIRCLE_RADIUS * 1.3 : CHAIN_CIRCLE_RADIUS);
+            }
+            svg.selectAll<SVGCircleElement, ChartNode>(".nodeCircle")
+                .attr("fill", (n) => n.id === d.id ? "gold" :
+                    NODEFLOW_COLORS[n.class as keyof typeof NODEFLOW_COLORS]);
+
+            const tooltipText = getTooltipText(d);
+            d3.select("#mainChartTooltip")
+                .style("visibility","visible")
+                .style("left",`${event.pageX + (networkCircleRadius * 2)}px`)
+                .style("top",`${event.pageY - 10}px`)
+                .html(tooltipText)
+        })
+        .on("mouseout" , () => {
+            d3.select("#mainChartTooltip").style("visibility","hidden");
+            svg.selectAll<SVGCircleElement, ChartNode>(".nodeCircle")
+                .attr("fill", (d) => NODEFLOW_COLORS[d.class as keyof typeof NODEFLOW_COLORS]);
+
+            if(chainGraphSvg.node()){
+                chainGraphSvg.selectAll(".nodeLabelTextPath")
+                    .attr("opacity", 1);
+
+                chainGraphSvg.selectAll<SVGCircleElement,ChainNode>(".nodeCircle")
+                    .attr("fill", (d) => NODEFLOW_COLORS[d.class as keyof typeof NODEFLOW_COLORS])
+            .attr("r",  CHAIN_CIRCLE_RADIUS);
+            }
+        })
 
     networkNodesGroup.select(".nodeCircle")
         .attr("fill", (d) => NODEFLOW_COLORS[d.class as keyof typeof NODEFLOW_COLORS])
@@ -698,16 +861,9 @@ export const drawGroupTree = (
         .attr("dy",-networkCircleRadius * 0.05)
         .text((d) => NODETYPE_ICONS[d.type as keyof typeof NODETYPE_ICONS]);
 
-    networkNodesGroup.select(".nodeCircleLabel")
-        .attr("visibility","hidden")
-        .attr("fill", COLORS.black)
-        .attr("text-anchor",(d) => d.finalDepth ? "start" : "end")
-        .attr("font-size", networkCircleRadius * 0.8)
-        .style("dominant-baseline","middle")
-        .attr("dy",-networkCircleRadius * 0.05)
-        .attr("transform",(d) => `translate(0,${(d.finalDepth ? -networkCircleRadius : networkCircleRadius) * 1.2}) rotate(-30)`)
-        .text((d) => d.node);
 
+    networkGroup.select(".networkNodeLinksGroup")
+        .attr("transform",(d) => `translate(${(-getNodeWidth(d,"bottom",svgWidth,direction)/2)},${(-getNodeHeight(d, "bottom",direction)/2)})`)
 
     const networkNodeLinksGroup = networkGroup.select(".networkNodeLinksGroup")
         .selectAll(".networkNodeLinkGroup")
@@ -719,7 +875,6 @@ export const drawGroupTree = (
             return enter;
         });
 
-    networkNodeLinksGroup.attr("transform",`translate(${-(nodeWidth/2)},${-(nodeHeight/2)})`)
 
     networkNodeLinksGroup
         .select(".linkAnimatePath")
@@ -772,30 +927,10 @@ export const drawGroupTree = (
         .attr("marker-end",`url(#arrowEndGrey${containerClass})`)
         .attr("stroke-width",0.75)
         .attr("d", (d) => {
-            let {x: sourceX, y: sourceY} = networkPositions[d.source as keyof typeof d];
-            let {x: targetX, y: targetY} = networkPositions[d.target as keyof typeof d];
-            const shiftBy = 0.5 +  (direction === "vertical" ? nodeHeight/2 : nodeWidth/2);
-            if(direction === "vertical"){
-                if(sourceY < targetY){
-                    sourceY += shiftBy;
-                    targetY -= shiftBy;
-                } else {
-                    sourceY -= shiftBy;
-                    targetY += shiftBy;
-                }
-            } else {
-                if(sourceX < targetX){
-                    sourceX += shiftBy;
-                    targetX -= shiftBy;
-                } else {
-                    sourceX -= shiftBy;
-                    targetX += shiftBy;
-                }
-            }
-            const path = `M${sourceX},${sourceY}L${targetX},${targetY}`;
-                svg.select(`#linkAnimatePath${d.id}`)
-                    .attr("d",path);
-             return path;
+            // far from ideal but just getting base functionality
+            d.sourcePositions = networkPositions[d.source as keyof typeof d];
+            d.targetPositions = networkPositions[d.target as keyof typeof d];
+            return ""
         })
 
     const networkNodesLinksGroup = svg.select(".chartGroup")
@@ -807,8 +942,6 @@ export const drawGroupTree = (
             enter.append("path").attr("class", "linkAnimatePath");
             return enter;
         });
-
-    networkNodesLinksGroup.attr("transform",`translate(${-nodeWidth/2},${-nodeHeight/2})`)
 
     networkNodesLinksGroup
         .select(".linkAnimatePath")
@@ -823,34 +956,43 @@ export const drawGroupTree = (
         .attr("marker-end",`url(#arrowEndGrey${containerClass})`)
         .attr("stroke-width",networkCircleRadius/8)
         .attr("d", (d) => {
-            const sourceNetwork = typeof d.source === "string" ? d.source.split("-")[1] : "";
-            const sourceNetworkPosition = networkPositions[sourceNetwork];
-            const sourceNodePosition = nodePositions[d.source as keyof typeof nodePositions];
-            if(!sourceNodePosition || !sourceNetworkPosition) return "";
-            const sourcePosition = {
-                x: sourceNodePosition.x + sourceNetworkPosition.x,
-                y: sourceNodePosition.y + sourceNetworkPosition.y};
-            const targetNetwork = typeof d.target === "string" ? d.target.split("-")[1] : "";
-            const targetNetworkPosition = networkPositions[targetNetwork];
-            const targetNodePosition = nodePositions[d.target as keyof typeof nodePositions];
-            if(!targetNodePosition || !targetNetworkPosition) return "";
-            const targetPosition = {
-                x: targetNodePosition.x + targetNetworkPosition.x,
-                y: targetNodePosition.y + targetNetworkPosition.y};
+            // layer + network group transform concatenated
+            // network nodes group (- half width, - half height)
+            const getNetwork = (id: string) => id.split("-")[1];
 
-            const originalPath = `M${sourcePosition.x},${sourcePosition.y}L${targetPosition.x},${targetPosition.y}`;
-            const path =  trimPathToRadius(originalPath,networkCircleRadius,networkCircleRadius)
+            const sourceNetwork = getNetwork(d.source);
+            const targetNetwork = getNetwork(d.target);
+
+            const sourceNetworkPos = networkPositions[sourceNetwork];
+            const targetNetworkPos = networkPositions[targetNetwork];
+
+            const sourceNode = nodePositions[d.source];
+            const targetNode = nodePositions[d.target];
+
+            if (!sourceNode || !targetNode) return "";
+
+            const getOffset = (pos: {x: number, y: number, bottomWidth: number, bottomHeight: number}, node: {x: number, y: number}) => ({
+                x: pos.x + node.x +  -pos.bottomWidth / 2 ,
+                y: pos.y + node.y +  -pos.bottomHeight / 2
+            });
+
+            const { x: sourceX, y: sourceY } = getOffset(sourceNetworkPos, sourceNode);
+            const { x: targetX, y: targetY } = getOffset(targetNetworkPos, targetNode);
+
+            const originalPath = `M${sourceX},${sourceY} L${targetX},${targetY}`;
+
+            const path = trimPathToRadius(originalPath,networkCircleRadius,networkCircleRadius);
             svg.select(`#linkAnimatePath${d.id}`)
                 .attr("d",path);
-            return path;
+            return path
           })
 
-    resetZoomLevels(svg,"top");
+    resetZoomLevels(svg,"top",svgWidth,direction);
 }
 
 const getLabelFontSize = (zoomLevel: string) => {
-    if(zoomLevel === "top") return 16;
-    return 12;
+    if(zoomLevel === "top") return getRemInPixels() * 1.5;
+    return getRemInPixels() * 1.1;
 }
 const getLabelDx = (zoomLevel: string, nodeWidth: number) => {
     if(zoomLevel === "top") return 0;
@@ -865,34 +1007,89 @@ const getLabelTextAnchor = (zoomLevel: string) => {
     if(zoomLevel === "top") return "middle";
     return "start";
 }
-export const resetZoomLevels = (svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>, zoomLevel: string) => {
 
-    const networkNode = d3.select(".networkRect");
-    if(networkNode.node()){
-        const nodeWidth = +networkNode.attr("width") || 0;
-        const nodeHeight  = +networkNode.attr("height") || 0;
-
-        svg.selectAll(".networkRectLabel")
-            .attr("font-size",getLabelFontSize(zoomLevel))
-            .attr("dx",getLabelDx(zoomLevel,nodeWidth))
-            .attr("dy",getLabelDy(zoomLevel,nodeHeight))
-            .attr("text-anchor",getLabelTextAnchor(zoomLevel));
-
-        svg.selectAll(".networkMidGroup")
-            .attr("display",zoomLevel === "middle" ? "block" : "none");
-
-        svg.selectAll(".networkLinkGroup")
-            .attr("display",zoomLevel === "bottom" ? "none" : "block");
-
-        svg.selectAll(".nodesLinkGroup")
-            .attr("display",zoomLevel === "bottom" ? "block" : "none");
-
-        svg.selectAll(".networkNodeLinksGroup")
-            .attr("display",zoomLevel === "bottom" ? "block" : "none");
-
-        svg.selectAll(".networkNodesGroup")
-            .attr("display",zoomLevel === "bottom" ? "block" : "none");
+const positionNetworkLink = (d: NetworkLink, zoomLevel: string, direction: string, nodeLinks: boolean) => {
+    let {x: sourceX, y: sourceY} = d.sourcePositions;
+    let {x: targetX, y: targetY} = d.targetPositions;
+    const {width: sWidth, height: sHeight} = d.sourceDimensions[zoomLevel][direction];
+    const {width: tWidth, height: tHeight} = d.sourceDimensions[zoomLevel][direction];
+    const sourceShift = 0.5 + (direction === "vertical" ? sHeight : sWidth)/2;
+    const targetShift = 0.5 + (direction === "vertical" ? tHeight : tWidth)/2;
+    // this could SO be improved
+    if(direction === "vertical"){
+        if(sourceY < targetY){
+            sourceY += sourceShift;
+            targetY -= targetShift;
+        } else {
+            sourceY -= sourceShift;
+            targetY += targetShift;
+        }
+        if(nodeLinks){
+            console.log('working')
+           // sourceX -= sWidth/2;
+          //  sourceY -= sHeight/2;
+         //   targetX -= sWidth/2;
+          //  targetY -= sHeight/2;
+        }
+    } else {
+        if(sourceX < targetX){
+            sourceX += sourceShift;
+            targetX -= targetShift;
+        } else {
+            sourceX -= sourceShift;
+            targetX += targetShift;
+        }
+        if(nodeLinks){
+            console.log('working')
+          //  sourceX -= sHeight/2;
+         ///   sourceY -= sWidth/2;
+         //   targetX -= sHeight/2;
+          //  targetY -= sWidth/2;
+        }
     }
+    return  `M${sourceX},${sourceY}L${targetX},${targetY}`;
+
+}
+export const resetZoomLevels = (svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>, zoomLevel: string, svgWidth: number ,direction: string) => {
+
+
+    d3.selectAll<SVGRectElement,NetworkData>(".networkRect")
+        .attr("width", (d) => getNodeWidth(d,zoomLevel, svgWidth, direction) )
+        .attr("height",(d) => getNodeHeight(d, zoomLevel, direction))
+        .attr("x",   (d) => -(getNodeWidth(d, zoomLevel,svgWidth, direction))/2  )
+        .attr("y",  (d) => -getNodeHeight(d, zoomLevel, direction)/2 );
+
+    svg.selectAll<SVGTextElement, NetworkData>(".networkRectLabel")
+        .attr("font-size",getLabelFontSize(zoomLevel))
+        .attr("dx",(d) => getLabelDx(zoomLevel,getNodeWidth(d,zoomLevel, svgWidth, direction)))
+        .attr("dy",(d) => getLabelDy(zoomLevel,getNodeHeight(d, zoomLevel, direction)))
+        .attr("text-anchor",getLabelTextAnchor(zoomLevel));
+
+    svg.selectAll(".networkMidGroup")
+        .attr("display",zoomLevel === "middle" ? "block" : "none");
+
+    svg.selectAll<SVGGElement, NetworkLink>(".networkLinkGroup")
+        .attr("display",zoomLevel === "bottom" ? "none" : "block")
+        .selectAll<SVGLineElement, NetworkLink>(".linkLine")
+        .attr("d", (d) => {
+            const path = positionNetworkLink(d, zoomLevel, direction,false)
+            svg.select(`#linkAnimatePath${d.id}`)
+                .attr("d",path);
+            return path;
+        })
+
+
+
+    svg.selectAll(".nodesLinkGroup")
+        .attr("display",zoomLevel === "bottom" ? "block" : "none")
+
+
+
+    svg.selectAll(".networkNodeLinksGroup")
+        .attr("display",zoomLevel === "bottom" ? "block" : "none");
+
+    svg.selectAll(".networkNodesGroup")
+        .attr("display",zoomLevel === "bottom" ? "block" : "none");
 }
 
 

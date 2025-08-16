@@ -1,10 +1,11 @@
-import {ArcRoute, ChainLink, ChainNode, ChartLink, Network, NetworkLink} from "@/types/data";
+import {ArcRoute, ChainLink, ChainNode, ChartLink, ChartNode, Network, NetworkLink} from "@/types/data";
 import Graph from "graphology";
 import {getLinkId} from "@/app/components/sharedFunctions";
 import {Attributes} from "graphology-types";
 import * as d3 from "d3";
-import {COLORS, NODEFLOW_COLORS, NODETYPE_ICONS} from "@/app/components/MainForceChart";
+import {COLORS, NODEFLOW_COLORS, NODETYPE_ICON_NAMES, NODETYPE_ICONS} from "@/app/components/MainForceChart";
 import {trimPathToRadius} from "@/app/components/MainForceChart_functions";
+import {CHAIN_CIRCLE_RADIUS} from "@/app/components/ChainForceChart";
 
 
 export const handleAnimationFlow = (
@@ -405,14 +406,35 @@ const getNodeOpacity = (d: ChainNode, nodeSelection: string[], isMouseover: bool
 }
 
 
+export const getTooltipText = (node: ChainNode | ChartNode) => {
+    const iconClass = NODETYPE_ICON_NAMES[node.type as keyof typeof NODETYPE_ICON_NAMES];
+    const classColor = NODEFLOW_COLORS[node.class as keyof typeof NODEFLOW_COLORS];
+    const {0: id, 1: network} = node.id.split("-")
+    let tooltipText = `<strong>${id}</strong><br>`;
+    tooltipText += `<span style="color: ${COLORS.darkgrey}">network:</span> ${network}<br>`;
+    tooltipText += `<span style="color: ${classColor}; font-weight: bolder;"> ${node.class}</span><br>`;
+    tooltipText += `<span style="color: ${COLORS.darkgrey}">type:</span> <i class='${iconClass}'></i>`
+    tooltipText += ` ${node.type}<br>`;
+    if(node.type === "comp"){
+        const alteredDesc = node.desc
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/\\n/g,'<br>');
+        tooltipText += `<br><span style="color: ${COLORS.darkgrey}"><pre><code>${alteredDesc}</code></pre></span>`
+    } else {
+        tooltipText += `<span style="color: ${COLORS.darkgrey}"><i>${node.desc}</i></span>`
+    }
+    return tooltipText;
+
+}
 export const drawChainForce = (
     svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
     nodes: ChainNode[],
     links: ChainLink[],
     simulation:  d3.Simulation<d3.SimulationNodeDatum, undefined>,
-    circleRadius: number,
     searchNodes: string[],
-    containerClass: string
+    containerClass: string,
+    mainContainerClass: string
 ) => {
     const flowModeSelectedNodes: string[] = [];
     const flowMode = false;
@@ -460,69 +482,92 @@ export const drawChainForce = (
             enter.append("circle").attr("class", "nodeBackgroundCircle");
             enter.append("circle").attr("class", "nodeCircle");
             enter.append("text").attr("class", "fa fa-strong nodeCircleIcon");
-         //   enter.append("rect").attr("class", "nodeLabelItem nodeLabelRect");
             enter.append("path").attr("class", "nodeLabelPath");
             enter
                 .append("text")
                 .attr("class", "nodeCircleLabel")
                 .append("textPath")
                 .attr("class", "nodeLabelTextPath");
-
-        //    enter.append("text").attr("class", "nodeLabelItem nodeLabel");
             return enter;
         });
-
 
     // transparent path for label
     nodesGroup
         .select(".nodeLabelPath")
-
         .attr("fill", "transparent")
         .attr("id", (d,i) => `labelCircle${i}`)
         .attr("d", (d) =>
             d3.arc()({
-                innerRadius: circleRadius + (searchNodes.includes(d.id)  ? 4 : 1) ,
-                outerRadius: circleRadius +  (searchNodes.includes(d.id) ? 4 : 1)  ,
+                innerRadius: CHAIN_CIRCLE_RADIUS + (searchNodes.includes(d.id)  ? 4 : 1) ,
+                outerRadius: CHAIN_CIRCLE_RADIUS +  (searchNodes.includes(d.id) ? 4 : 1)  ,
                 startAngle: -Math.PI,
                 endAngle: Math.PI
             }))
-
+    
     // label
     nodesGroup
         .select(".nodeLabelTextPath")
         .attr("startOffset", "25%")
         .style("letter-spacing","-0.35px")
-        .attr("font-size", circleRadius * 0.55)
+        .attr("font-size", CHAIN_CIRCLE_RADIUS * 0.55)
         .attr("text-anchor", "middle")
         .attr("xlink:href", (d,i) => `#labelCircle${i}`)
         .text((d) => d.id.split("-")[0]);
 
+    const mainGraphSvg = d3.select(`.svg_${mainContainerClass}`);
+    nodesGroup.on("mousemove", (event, d) => {
 
-    nodesGroup.on("mouseover", (event, d) => {
-        svg.selectAll<SVGCircleElement | SVGTextElement, ChainNode>(".nodeLabelItem")
-            .attr("display",(n) => n.id === d.id ? "block" : "none")
+        if(mainGraphSvg.node()) {
+            mainGraphSvg.selectAll<SVGGElement, ChainNode>(".nodeCircle")
+                .attr("fill", (n) => n.id === d.id ? "gold" :
+                    NODEFLOW_COLORS[n.class as keyof typeof NODEFLOW_COLORS])
+
+            mainGraphSvg.selectAll<SVGGElement,ChainNode>(".networkRect")
+                .attr("fill", (n) => n.network === d.network ? COLORS.lightgrey : "white")
+
+        }
+            svg.selectAll<SVGTextPathElement, ChainNode>(".nodeLabelTextPath")
+            .attr("opacity", (l) => l.id === d.id ? 0 : 1);
+
+        svg.selectAll<SVGCircleElement, ChainNode>(".nodeCircle")
+            .attr("r", (n) => n.id === d.id ? CHAIN_CIRCLE_RADIUS * 1.3 : CHAIN_CIRCLE_RADIUS);
+
+        const tooltipText = getTooltipText(d);
+        d3.select("#chainChartTooltip")
+            .style("visibility","visible")
+            .style("left",`${event.offsetX + CHAIN_CIRCLE_RADIUS + 5}px`)
+            .style("top",`${event.offsetY - 10}px`)
+            .html(tooltipText)
     })
         .on("mouseout",() => {
-            svg.selectAll(".nodeLabelItem")
-                .attr("display", "none")
+            if(mainGraphSvg.node()) {
+                mainGraphSvg.selectAll<SVGGElement, ChainNode>(".nodeCircle")
+                    .attr("fill", (n) => NODEFLOW_COLORS[n.class as keyof typeof NODEFLOW_COLORS])
+                mainGraphSvg.selectAll(".networkRect")
+                    .attr("fill","white");
+              }
+            svg.selectAll(".nodeCircle").attr("r", CHAIN_CIRCLE_RADIUS);
+            svg.selectAll(".nodeLabelTextPath").attr("opacity", 1);
+            d3.select("#chainChartTooltip")
+                .style("visibility","hidden")
 
         })
     nodesGroup
         .select(".nodeBackgroundCircle")
-        .attr("r", circleRadius)
+        .attr("r", CHAIN_CIRCLE_RADIUS)
         .attr("fill", "var(--background)")
         .attr("stroke-width",(d) =>  searchNodes.includes(d.id) ? 8 : 0)
         .attr("stroke", (d) => !flowMode &&  searchNodes.includes(d.id) ? "gold" : getNodeCircleFill(d,flowModeSelectedNodes,flowMode))
 
     nodesGroup
         .select(".nodeCircle")
-        .attr("r", circleRadius)
+        .attr("r", CHAIN_CIRCLE_RADIUS)
         .attr("fill",(d) => getNodeCircleFill(d, flowModeSelectedNodes,flowMode))
        .attr("opacity", (d) => getNodeOpacity(d,selectedNodes, false));
 
     nodesGroup
         .select(".nodeCircleIcon")
-        .attr("font-size", circleRadius * 1.3)
+        .attr("font-size", CHAIN_CIRCLE_RADIUS * 1.3)
         .attr("fill", "white")
         .attr("text-anchor","middle")
         .style("dominant-baseline","middle")
@@ -530,8 +575,8 @@ export const drawChainForce = (
         .text((d) => NODETYPE_ICONS[d.type as keyof typeof NODETYPE_ICONS]);
 
     const getLabelDy = (d: ChainNode) => {
-        if(d.depth <= maxDepth/2) return -(circleRadius * 1.2);
-        if(d.depth > maxDepth/2) return circleRadius * 1.7;
+        if(d.depth <= maxDepth/2) return -(CHAIN_CIRCLE_RADIUS * 1.2);
+        if(d.depth > maxDepth/2) return CHAIN_CIRCLE_RADIUS * 1.7;
 
         return 2;
     }
@@ -571,7 +616,7 @@ export const drawChainForce = (
                 const {x: targetX, y: targetY} = target;
                 if(!sourceX || !sourceY || !targetX || !targetY) return "";
                 const originalPath = `M${sourceX},${sourceY} L${targetX},${targetY}`;
-                return trimPathToRadius(originalPath,circleRadius,circleRadius + 5);
+                return trimPathToRadius(originalPath,CHAIN_CIRCLE_RADIUS,CHAIN_CIRCLE_RADIUS + 5);
             })
 
         svg
@@ -583,7 +628,7 @@ export const drawChainForce = (
                 const {x: targetX, y: targetY} = target;
                 if(!sourceX || !sourceY || !targetX || !targetY) return ""
                 const originalPath =  `M${sourceX },${sourceY} L${targetX },${targetY }`;
-                return trimPathToRadius(originalPath,circleRadius+ 5,circleRadius + 5);
+                return trimPathToRadius(originalPath,CHAIN_CIRCLE_RADIUS+ 5,CHAIN_CIRCLE_RADIUS + 5);
             })
 
         svg.selectAll<SVGGElement,ChainNode>(".nodesGroup")

@@ -121,7 +121,8 @@ const startSearchData = getSearchData(chartData,startArchitecture);
 
 export default  function Home() {
 
-    const divClass = "mainForceChart";
+    const mainDivClass = "mainForceChart";
+    const chainDivClass = "searchResultsChain";
     const [panelOpen, setPanelOpen] = useState(false);
     const [direction, setDirection] = useState<"vertical" | "horizontal">('vertical');
     const [architectureId, setArchitectureId] = useState<number>(startArchitecture);
@@ -152,8 +153,8 @@ export default  function Home() {
   return (
       <>
           {/* Central Chart Area */}
-          <div className={` ${divClass}Container ml-0 ${searchNodes.length === 0 ? "w-full md:ml-[50px] md:w-[calc(100%-50px)]" : "w-[calc(100%-360px)] md:ml-[330px] md:w-[calc(100%-330px)]"}   h-full bg-blue-100`}>
-              <MainForceChart searchNodes={searchNodes} chartData={chartData} architectureId={architectureId} containerClass={divClass} direction={direction}/>
+          <div className={` ${mainDivClass}Container ml-0 ${searchNodes.length === 0 ? "w-full md:ml-[50px] md:w-[calc(100%-50px)]" : "w-[calc(100%-360px)] md:ml-[330px] md:w-[calc(100%-330px)]"}   h-full bg-blue-100`}>
+              <MainForceChart searchNodes={searchNodes} chartData={chartData} architectureId={architectureId} containerClass={mainDivClass} chainContainerClass={chainDivClass} direction={direction}/>
           </div>
 
           {/* Side Panel toggle icon (desktop) */}
@@ -174,7 +175,7 @@ export default  function Home() {
           {/* SidePanel - only visible on menu click */}
           <SidePanel isOpen={panelOpen} onClose={() => setPanelOpen(false)} architectures={architectures} updateArchitectureId={updateArchitectureId}/>
           {/* SearchResultsPanel - only visible on selecting valid search result */}
-          <SearchResultsPanel mainContainerClass = {divClass} chartData={chartData} searchNodes={searchNodes} searchDirection={searchDirection} architectureId={architectureId}></SearchResultsPanel>
+          <SearchResultsPanel chainContainerClass={chainDivClass} mainContainerClass = {mainDivClass} chartData={chartData} searchNodes={searchNodes} searchDirection={searchDirection} architectureId={architectureId}></SearchResultsPanel>
       </>
 
   );

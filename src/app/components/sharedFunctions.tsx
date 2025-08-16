@@ -6,3 +6,5 @@ export const getLinkId = (link: ChartLink | ChainLink , direction: "source" | "t
     if (node.id) return  node.id;
     return "" // shouldn't happen
 }
+
+export const getRemInPixels = () =>  parseFloat(getComputedStyle(document.documentElement).fontSize)

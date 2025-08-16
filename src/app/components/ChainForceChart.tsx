@@ -23,6 +23,8 @@ type ChainForceChartProps = {
     architectureId: number;
 }
 
+export const CHAIN_CIRCLE_RADIUS = 12;
+
 const ChainForceChart: FC<ChainForceChartProps> = ({
                                                                  containerClass,
     mainContainerClass,
@@ -109,10 +111,7 @@ const ChainForceChart: FC<ChainForceChartProps> = ({
                 .attr("font-weight",500)
                 .text(`${depthMax} levels`)
 
-
-            const minNodeRadius = 12;
-
-            const minHeightNeeded = (depthMax * (minNodeRadius * 4)) + margin.top - margin.bottom;
+            const minHeightNeeded = (depthMax * (CHAIN_CIRCLE_RADIUS * 4)) + margin.top - margin.bottom;
 
             if(svgHeight < minHeightNeeded){
                 svgHeight = minHeightNeeded;
@@ -136,11 +135,11 @@ const ChainForceChart: FC<ChainForceChartProps> = ({
                 .force("x", d3.forceX<ChainNode>(svgWidth/2).strength(0.05))
                 .force("y", d3.forceY<ChainNode>((d) => ((searchDirection === "input" ? d.depth : maxDepth - d.depth) + 1) * depthHeight).strength(1))
                 .force("link", d3.forceLink<ChainNode,ChainLink>().id((d) => d.id).strength(0))
-                .force("collide", d3.forceCollide<ChainNode>().radius(Math.max(collideRadius,minNodeRadius * 1.4)).strength(1).iterations(2))
+                .force("collide", d3.forceCollide<ChainNode>().radius(Math.max(collideRadius,CHAIN_CIRCLE_RADIUS * 1.4)).strength(1).iterations(2))
 
             simulation.stop();
 
-            drawChainForce(svg,nodes,links,simulation,minNodeRadius,searchNodes,containerClass);
+            drawChainForce(svg,nodes,links,simulation,searchNodes,containerClass,mainContainerClass);
 
 
                 // need to decide how to handle this..
@@ -164,8 +163,6 @@ const ChainForceChart: FC<ChainForceChartProps> = ({
                     .attr("x",0)
                    .attr("y", (d,i) => i * 11)
                   .html((d) => d)
-
-
 
             svg.select(".playButton")
                 .attr("fill","white")
@@ -209,7 +206,8 @@ const ChainForceChart: FC<ChainForceChartProps> = ({
 
     return (
         <>
-            <svg className={"noselect"} ref={ref}>
+            <div id="chainChartTooltip" className={"chartTooltip"}/>
+            <svg className={`noselect svg_${containerClass}`} ref={ref}>
                 <circle className={"playButton"}/>
                 <text className={"fa playButtonIcon"}/>
                 <text className={"description"}/>

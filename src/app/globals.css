@@ -5,6 +5,29 @@
   -webkit-user-select: none; /* Safari */
   -ms-user-select: none;     /* IE 10+ */
 }
+/* Base font-size (mobile first) */
+html {
+  font-size: 75%; /* 14.4px */
+}
+
+@media (min-width: 668px) and (min-height: 500px){
+  html {
+    font-size: 80%; /* 16px */
+  }
+}
+
+
+@media (min-width: 768px) and (min-height: 600px) {
+  html {
+    font-size: 100%; /* 16px */
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 750px) {
+  html {
+    font-size: 120%; /* 17.6px */
+  }
+}
 
 :root {
   --background:  #f1f0ff;
@@ -36,4 +59,19 @@ body {
 
 .d3ChartContainer {
   position: relative;
+}
+
+.chartTooltip {
+  visibility: hidden;
+  position: absolute;
+  text-align: left;
+  border: 0.5px solid #A0A0A0;
+  padding: 5px;
+  font: 12px sans-serif;
+  background: #F0f0f0;
+  border-radius: 4px;
+  pointer-events: none;
+  width: auto;
+  height: auto;
+  z-index: 3000;
 }
