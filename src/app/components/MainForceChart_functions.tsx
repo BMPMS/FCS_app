@@ -517,10 +517,12 @@ export const drawGroupTree = (
 
 ) => {
 
-    const marginTop = 30;
+    const marginTop = 60;
     // currently array of networks with positioning and data (can also have multiple architectures if needed)
     const treeData =  getTreeData(chartData,svgWidth,svgHeight, marginTop,direction);
 
+    console.log(treeData)
+    debugger;
     const padding = getRemInPixels();
 
     svg.select(".chartGroup").attr("transform",`translate(0,${marginTop})`)
@@ -686,7 +688,7 @@ export const drawGroupTree = (
         .attr("y",  (d) => -getNodeHeight(d, "top",direction)/2 );
 
     networkGroup.select(".networkRectLabel")
-      //  .attr("x",   (d) => getNodeWidth(d, "top",svgWidth,direction)/2)
+      //  .attr("x",   (networks.json) => getNodeWidth(networks.json, "top",svgWidth,direction)/2)
         .attr("text-anchor","middle")
         .attr("fill", COLORS.darkblue)
         .style("dominant-baseline","middle")

@@ -273,7 +273,7 @@ const animatePaths = (
         .duration(100)
         .attr("stroke","transparent")
         .attr("marker-end", (d) => `url(#arrowEnd${d.type === "suppress" ? "Red" : "Green"}${containerClass})`)
-        //  .attr("marker-end", (d) => getMarker(d,"end",d.type === "suppress" ? "Red" : "Green",containerClass))
+        //  .attr("marker-end", (networks.json) => getMarker(networks.json,"end",networks.json.type === "suppress" ? "Red" : "Green",containerClass))
 }
 
 export const measureWidth = (text: string, fontSize: number) => {
